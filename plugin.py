@@ -1,11 +1,11 @@
 ##           HomeWizard Wi-Fi 1F Meter Plugin
 ##
 ##           Author:         FdeKruijf
-##           Version:        1.0.0
-##           Last modified:  03-05-2025
+##           Version:        1.0.1
+##           Last modified:  29-09-2025
 ##
 """
-<plugin key="HomeWizardWifi1FMeter" name="HomeWizard Wi-Fi 1F Meter" author="FdeKruijf" version="1.0.0" externallink="https://www.homewizard.nl/kwh-meter">
+<plugin key="HomeWizardWifi1FMeter" name="HomeWizard Wi-Fi 1F Meter" author="FdeKruijf" version="1.0.1" externallink="https://www.homewizard.nl/kwh-meter">
     <description>
         
     </description>
@@ -24,9 +24,9 @@
                 <option label="5 minutes" value="300"/>
             </options>
         </param>
-        <param field="Mode3" label="Usage value (Watt)" width="100px" required="false" default="0" />
+        <param field="Mode3" label="Counter offset (Wh)" width="100px" required="false" default="0" />
         <param field="Mode4" label="Production value (Watt)" width="100px" required="false" default="0" />
-        <param field="Mode5" label="0=Only active_apparent, +1=Also reactive and factor" width="50px" required="false" default="0"/>
+        <param field="Mode5" label="0=Only active_apparent, 1=Also reactive and factor" width="50px" required="false" default="0"/>
         <param field="Mode6" label="Debug" width="75px">
             <options>
                 <option label="True" value="Debug"/>
@@ -47,39 +47,46 @@ class BasePlugin:
     dataInterval = 60       #in seconds
     dataIntervalCount = 0
     
-    #Homewizard kWh meter variables contains "name of element", [initial value,initial value to generate device, device-ID,
+    # Homewizard kWh meter variables contains in varable elements:
+    # {"name of element",
+    # [initial value to generate device; replaced by the readed values after reading the parameters from the device,
+    # True or False; if True generate device else do not, but see further on,
+    # device-ID; ; used as Unit and in as second part in ID in list of devices,
     # multiplying factor for the right shown value, W,Wh,VA,A, percentage]
-    # device-ID<=0 never generate device, >0 means genarate if True, but if Mode4=1 change False in True
+    #
+    # device-ID<=0 never generate device, >0 means generate if True, but if Mode5=1 change False in True
     # example values shown are values once read from the 1F meter
-    #: Not used in plugin
+	#
+    #: Not used in plugin because device-ID = 0
     elements={"wifi_ssid":["",False,0,1],                     # example value "ABCDE"
     #: [Number] The strength of the Wi-Fi signal, generate device, device-ID
     "wifi_strength":[-1,True,180,1],                          # example value "100" is percentage
-    #: [Number] The counter of the really imported energy in the meter, generate device, -(part of device-ID)
+    #: [Number] The counter of the really imported energy in the meter, generate device, -(part of device-ID and Unit#)
     "total_power_import_kwh":[-1,False,-101,1000],               # example value in kWh "0.02"
-    #: [Number] The counter of the measured imported energy in the meter, generate device, -(part of device-ID)
+    #: [Number] The counter of the measured imported energy in the meter, generate device, -(part of device-ID and Unit#)
     "total_power_import_t1_kwh":[-1,False,-101,1000],            # example value in kWh "305.332"
-    #: [Number] The counter of the measured exported energy in the meter, generate device, -(part of device-ID)
+    #: [Number] The counter of the measured exported energy in the meter, generate device, -(part of device-ID and Unit#)
     "total_power_export_kwh":[-1,False,-101,1000],               # example value in kWh "0.003"
-    #: [Number] The counter of the measured exported energy in the meter, generate device, -(parts of device-ID)
+    #: [Number] The counter of the measured exported energy in the meter, generate device, -(part of device-ID and Unit#)
     "total_power_export_t1_kwh":[-1,False,-101,1000],            # example value in kWh "0.003"
-    #: [Number] The really currently measured power (W) in the meter, generate device, device-ID
+    # When processing next element also above values are used with device-ID -101
+    #: [Number] The really currently measured power (W) in the meter, generate device, part of device-ID and Unit#
     "active_power_w":[-1000000.0,True,101,1],                 # example value in W "25.931"
-    #: [Number] The really currenly measured power in the meters only phase, generate device, device-ID
+    #: [Number] The really currenly measured power in the meters only phase, generate device, part of device-ID and Unit#
     "active_power_l1_w":[-1000000.0,True,105,1],              # example value in W "25.931"
-    #: [Number] The voltage coming from the grid, generate device, device-ID
+    #: [Number] The voltage coming from the grid, generate device, part of device-ID and Unit#
     "active_voltage_v":[-1.0,True,108,1],                  # example value in V "231.55"
-    #: [Number] The current that flows in the meter, generate device, device-ID
+    #: [Number] The current that flows in the meter, generate device, part of device-ID and Unit#
     "active_current_a":[-1000000.0,True,120,1],               # example value in A "0.122"
-    #: [Number] The apparent current that flows in the meter, device generated, device-ID
+    #: [Number] The apparent current that flows in the meter, device generated, part of device-ID and Unit#
     "active_apparent_current_a":[-1000000.0,False,130,1],     # example value in A "0.124"
-    #: [Number] The current that does not produce used power, device generated, device-ID
+    #: [Number] The current that does not produce used power, device generated, part of device-ID and Unit#
     "active_reactive_current_a":[-1000000.0,False,140,1],     #example value in A "0.022"
-    #: [Number] The used power and non-productive power in the meter, device generated, device-ID
+    #: [Number] The used power and non-productive power in the meter, device generated, part of device-ID and Unit#
     "active_apparent_power_va":[-1000000.0,False,150,1],       # example value in VA "26.357"
-    #: [Number] The non-productive power in the meter, device generated, device-ID
+    #: [Number] The non-productive power in the meter, device generated, part of device-ID and Unit#
     "active_reactive_power_var":[-1000000.0,False,160,1],     # example value in VAr "4.717"
-    #: [Number] Percentage of total power (used+non-used) realy used, device generated, device-ID
+    #: [Number] Percentage of total power (used+non-used) realy used, device generated, part of device-ID and Unit#
     "active_power_factor":[-1,False,171,100],                # example value "0.984"
     #: [Number] frequency in Hz, device generated, device-ID=0 means do never generate device
     "active_frequency_hz":[-1.0,False,0,1]}                   # example value "50.049"
@@ -89,6 +96,8 @@ class BasePlugin:
     import_active_power_w = 0       #: The current power imported from the net.
     export_active_power_w = 0       #: The current power exported to the net.
     Debug = False
+    counterOffsetValue = 0          #: The value set with Mode3; however when this hardware device is used more than once
+                                    # this value can not be used it takes the value of the last initialized device
     
     def onStart(self):
         if Parameters["Mode6"] == "Debug":
@@ -103,12 +112,12 @@ class BasePlugin:
             # If not, set to 60 sec.
             self.dataInterval = 60
             
-        # If usage switch value
-        #if isNumber(Parameters["Mode3"]) == True and 1 <= int(Parameters["Mode3"]) <= 999999:
-        #    self.usageSwitchValue = int(Parameters["Mode3"])
-        #else:
-        #    # If not, set to 0 (means off)
-        #    self.usageSwitchValue = 0
+        # If counter offset value
+        if isNumber(Parameters["Mode3"]) == True and 1 <= int(Parameters["Mode3"]) <= 99999999:
+            self.counterOffsetValue = int(Parameters["Mode3"])
+        else:
+            # If not, set to 0 (means no offset)
+            self.counterOffsetValue = 0
             
         # If production switch value
         #if isNumber(Parameters["Mode4"]) == True and 1 <= int(Parameters["Mode4"]) <= 999999:
@@ -137,6 +146,14 @@ class BasePlugin:
         return True
 
     def onMessage(self, Data, Status, Extra):
+        # Make sure counterOffsetValue and Debug use the values for the current hardware device
+        if isNumber(Parameters["Mode3"]) == True and 1 <= int(Parameters["Mode3"]) <= 99999999:
+            self.counterOffsetValue = int(Parameters["Mode3"])
+        else:
+            # If not, set to 0 (means no offset)
+            self.counterOffsetValue = 0
+        if Parameters["Mode6"] == "Debug":
+            self.Debug = True
         try:
             Domoticz.Debug("Processing electricity values from 1F input")
             if self.Debug: self.logMessage("Position 1")
@@ -161,6 +178,8 @@ class BasePlugin:
                                 active_power_counter = active_power_counter + self.elements[x][0]
                             else: # means export
                                 active_power_counter = active_power_counter - self.elements[x][0]
+                            # add an offset to the counter value
+                                active_power_counter = active_power_counter +self.counterOffsetValue 
                     elif (self.elements[x][2] == 101):
                         active_power_w = self.elements[x][0]
                     # end of initial processing
@@ -169,7 +188,7 @@ class BasePlugin:
                     # device already generated?
                     if (self.elements[x][2] not in Devices): # [2] is device-ID
                         if self.Debug: self.logMessage("Position after not in Devices x=" + x + " elements[x][2]=" + str(self.elements[x][2]))
-                        try: # Device with one or two counter and W value?
+                        try: # Device with one or two counters and W value?
                             if (self.elements[x][2] in {101}):
                                 # x is: active_power_w
                                 if self.Debug: self.logMessage("Create device 101 with W")
